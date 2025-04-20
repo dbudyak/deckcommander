@@ -1,0 +1,40 @@
+[gd_scene load_steps=3 format=3 uid="uid://8tetw1k11l3x"]
+
+[ext_resource type="Script" uid="uid://b8qfe75qeeqj5" path="res://main.gd" id="1_ig7tw"]
+[ext_resource type="PackedScene" uid="uid://ej135486728r" path="res://file_panel.tscn" id="2_0xm2m"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ig7tw")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 128.0
+offset_bottom = 152.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelsContainer" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+alignment = 1
+
+[node name="LeftPanel" parent="VBoxContainer/PanelsContainer" instance=ExtResource("2_0xm2m")]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightPanel" parent="VBoxContainer/PanelsContainer" instance=ExtResource("2_0xm2m")]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StatusLabel" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 0
