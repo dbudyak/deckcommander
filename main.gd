@@ -7,8 +7,8 @@ extends Control
 var active_panel = "left"  # or "right"
 
 func _ready():
-	left_panel.set_path(OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS))
-	right_panel.set_path(OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS))
+	left_panel.set_path(OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP))
+	right_panel.set_path(OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP))
 
 	left_panel.grab_focus()
 	left_panel.is_focused = true

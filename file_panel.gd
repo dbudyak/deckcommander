@@ -10,7 +10,6 @@ signal file_selected(file_name: String, is_dir: bool)
 signal path_changed(new_path: String)
 
 func _ready():
-	# Placeholder path, can be set from outside
 	if current_path == null or current_path == "":
 		current_path = OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
 	update_file_list()
@@ -20,7 +19,10 @@ func set_path(path: String):
 	update_file_list()
 
 func update_file_list():
-	#file_list.clear()
+	var children = file_list.get_children()
+	for c in children:
+		file_list.remove_child(c)
+		
 	current_path_label.text = "📁 " + current_path
 
 	var dir = DirAccess.open(current_path)
@@ -47,7 +49,7 @@ func update_file_list():
 
 func _on_file_pressed(file_name: String, is_dir: bool):
 	if is_dir:
-		current_path = current_path + file_name
+		current_path = current_path + "/" + file_name
 		update_file_list()
 		emit_signal("path_changed", current_path)
 	else:
