@@ -1,8 +1,8 @@
 extends Control
 
-@onready var left_panel : VBoxContainer = $VBoxContainer/PanelsContainer/LeftPanel
-@onready var right_panel : VBoxContainer = $VBoxContainer/PanelsContainer/RightPanel
-@onready var status_label : HBoxContainer = $VBoxContainer/StatusLabel
+@onready var left_panel : VBoxContainer = $Panel/VBoxContainer/PanelsContainer/LeftPanel
+@onready var right_panel : VBoxContainer = $Panel/VBoxContainer/PanelsContainer/RightPanel
+@onready var status_label : HBoxContainer = $Panel/VBoxContainer/StatusLabel
 
 var active_panel : String= "left"  # or "right"
 

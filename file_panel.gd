@@ -39,13 +39,15 @@ func update_file_list():
 			btn.text = ("[DIR] " if is_dir else "") + file_name
 			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			btn.focus_mode = Control.FOCUS_ALL
-			
-			print(file_name)
 
-			btn.connect("pressed", Callable(self, "_on_file_pressed").bind(file_name, is_dir))
+			btn.connect(
+				"pressed", 
+				Callable(self, "_on_file_pressed").bind(file_name, is_dir)
+			)
 			file_list.add_child(btn)
 		file_name = dir.get_next()
 	dir.list_dir_end()
+
 
 func _on_file_pressed(file_name: String, is_dir: bool):
 	if is_dir:
