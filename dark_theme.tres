@@ -84,20 +84,20 @@ corner_detail = 5
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_2jabw"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7scd8"]
-content_margin_left = 0.0
-content_margin_top = 0.0
-content_margin_right = 0.0
-content_margin_bottom = 0.0
+content_margin_left = 20.0
+content_margin_top = 20.0
+content_margin_right = 20.0
+content_margin_bottom = 20.0
 bg_color = Color(0.117647, 0.117647, 0.117647, 1)
 corner_radius_top_left = 3
 corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 corner_detail = 5
-expand_margin_left = 5.0
-expand_margin_top = 5.0
-expand_margin_right = 5.0
-expand_margin_bottom = 5.0
+expand_margin_left = 50.0
+expand_margin_top = 50.0
+expand_margin_right = 50.0
+expand_margin_bottom = 50.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_4sa7s"]
 content_margin_left = 4.0
@@ -161,7 +161,7 @@ Label/constants/outline_size = 0
 Label/constants/shadow_offset_x = 1
 Label/constants/shadow_offset_y = 1
 Label/constants/shadow_outline_size = 1
-Label/font_sizes/font_size = 16
+Label/font_sizes/font_size = 22
 Label/fonts/font = ExtResource("1_c1cel")
 Label/styles/normal = SubResource("StyleBoxEmpty_2jabw")
 Panel/styles/panel = SubResource("StyleBoxFlat_7scd8")

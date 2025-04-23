@@ -25,29 +25,47 @@ func update_file_list():
 		
 	current_path_label.text = "📁 " + current_path
 
-	var dir = DirAccess.open(current_path)
+	var dir : DirAccess = DirAccess.open(current_path)
 	if dir == null:
 		return
 
 	dir.list_dir_begin()
 	var file_name = dir.get_next()
 
+	var files : Array[String] = []
+	var dirs : Array[String] = []
+	
 	while file_name != "":
 		if file_name != "." and file_name != "..":
-			var is_dir = dir.current_is_dir()
-			var btn = Button.new()
-			btn.text = ("[DIR] " if is_dir else "") + file_name
-			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			btn.focus_mode = Control.FOCUS_ALL
-
-			btn.connect(
-				"pressed", 
-				Callable(self, "_on_file_pressed").bind(file_name, is_dir)
-			)
-			file_list.add_child(btn)
+			if dir.current_is_dir():
+				dirs.append(file_name)
+			else:
+				files.append(file_name)
+				
 		file_name = dir.get_next()
-	dir.list_dir_end()
-
+		
+	dirs.sort()
+	for file : String in dirs:
+		file_list.add_child(build_file_item(file, true))
+		
+	files.sort()
+	for file : String in files:
+		file_list.add_child(build_file_item(file, false))
+	
+	var first_button : Button = file_list.get_child(0)
+	first_button.grab_focus()
+	
+func build_file_item(file_name: String, is_dir: bool) -> Button:
+	var btn = Button.new()
+	btn.text = ("📁 " if is_dir else "📄 ") + file_name
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.focus_mode = Control.FOCUS_ALL
+	btn.connect(
+		"pressed", 
+		Callable(self, "_on_file_pressed").bind(file_name, is_dir)
+	)
+	return btn
 
 func _on_file_pressed(file_name: String, is_dir: bool):
 	if is_dir:

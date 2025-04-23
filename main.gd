@@ -22,7 +22,7 @@ func _unhandled_input(event):
 
 func toggle_active_panel():
 	if active_panel == "left":
-		active_panel = "right"
+		active_panel = "aright"
 		left_panel.is_focused = false
 		right_panel.is_focused = true
 		right_panel.grab_focus()
