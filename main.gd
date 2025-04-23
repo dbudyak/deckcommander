@@ -10,9 +10,7 @@ func _ready():
 	left_panel.set_path(OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP))
 	right_panel.set_path(OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP))
 
-	left_panel.grab_focus()
-	left_panel.is_focused = true
-	right_panel.is_focused = false
+	toggle_active_panel()
 
 func _unhandled_input(event):
 	if event.is_action_pressed("ui_focus_next"):  # remap to Tab or L/R bumper
