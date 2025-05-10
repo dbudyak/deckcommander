@@ -6,13 +6,13 @@ extends Control
 
 var active_panel : String= "left"  # or "right"
 
-func _ready():
+func _ready() -> void:
 	left_panel.set_path(OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP))
 	right_panel.set_path(OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP))
 
 	toggle_active_panel()
 
-func _unhandled_input(event):
+func _unhandled_input(event) -> void:
 	if event.is_action_pressed("ui_focus_next"):  # remap to Tab or L/R bumper
 		toggle_active_panel()
 	elif event.is_action_pressed("ui_cancel"):
@@ -20,7 +20,7 @@ func _unhandled_input(event):
 	elif event.is_action_pressed("ui_text_backspace"):
 		get_active_panel().go_up()
 
-func toggle_active_panel():
+func toggle_active_panel() -> void:
 	if active_panel == "left":
 		active_panel = "aright"
 		left_panel.is_focused = false

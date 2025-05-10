@@ -9,16 +9,16 @@ var is_focused: bool = false
 signal file_selected(file_name: String, is_dir: bool)
 signal path_changed(new_path: String)
 
-func _ready():
+func _ready() -> void:
 	if current_path == null or current_path == "":
 		current_path = OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
 	update_file_list()
 
-func set_path(path: String):
+func set_path(path: String) -> void:
 	current_path = path
 	update_file_list()
 
-func update_file_list():
+func update_file_list() -> void:
 	var children = file_list.get_children()
 	for c in children:
 		file_list.remove_child(c)
@@ -67,7 +67,7 @@ func build_file_item(file_name: String, is_dir: bool) -> Button:
 	)
 	return btn
 
-func _on_file_pressed(file_name: String, is_dir: bool):
+func _on_file_pressed(file_name: String, is_dir: bool) -> void:
 	if is_dir:
 		current_path = current_path + "/" + file_name
 		update_file_list()
@@ -75,7 +75,7 @@ func _on_file_pressed(file_name: String, is_dir: bool):
 	else:
 		emit_signal("file_selected", file_name, is_dir)
 
-func go_up():
+func go_up() -> void:
 	var parent = current_path.get_base_dir()
 	if parent != current_path:
 		current_path = parent
