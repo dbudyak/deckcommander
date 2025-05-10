@@ -1,4 +1,5 @@
 extends VBoxContainer
+class_name FilePanel
 
 @onready var current_path_label = $CurrentPathLabel
 @onready var file_list = $ScrollContainer/FileList

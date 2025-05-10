@@ -1,8 +1,8 @@
 [gd_scene load_steps=4 format=3 uid="uid://8tetw1k11l3x"]
 
-[ext_resource type="Theme" uid="uid://tht8k0c33bff" path="res://dark_theme.tres" id="1_h2yge"]
-[ext_resource type="Script" uid="uid://b8qfe75qeeqj5" path="res://main.gd" id="1_ig7tw"]
-[ext_resource type="PackedScene" uid="uid://ej135486728r" path="res://file_panel.tscn" id="2_0xm2m"]
+[ext_resource type="Theme" uid="uid://tht8k0c33bff" path="res://themes/dark_theme.tres" id="1_sugp2"]
+[ext_resource type="Script" uid="uid://b8qfe75qeeqj5" path="res://scripts/main.gd" id="2_jyhfs"]
+[ext_resource type="PackedScene" uid="uid://ej135486728r" path="res://scenes/file_panel.tscn" id="3_tbgi4"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -11,8 +11,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme = ExtResource("1_h2yge")
-script = ExtResource("1_ig7tw")
+theme = ExtResource("1_sugp2")
+script = ExtResource("2_jyhfs")
 
 [node name="Panel" type="Panel" parent="."]
 layout_mode = 1
@@ -41,10 +41,10 @@ custom_minimum_size = Vector2(0, 960)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="LeftPanel" parent="Panel/VBoxContainer/PanelsContainer" instance=ExtResource("2_0xm2m")]
+[node name="LeftPanel" parent="Panel/VBoxContainer/PanelsContainer" instance=ExtResource("3_tbgi4")]
 layout_mode = 2
 
-[node name="RightPanel" parent="Panel/VBoxContainer/PanelsContainer" instance=ExtResource("2_0xm2m")]
+[node name="RightPanel" parent="Panel/VBoxContainer/PanelsContainer" instance=ExtResource("3_tbgi4")]
 layout_mode = 2
 
 [node name="StatusLabel" type="HBoxContainer" parent="Panel/VBoxContainer"]
