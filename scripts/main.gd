@@ -4,7 +4,7 @@ extends Control
 @onready var right_panel : VBoxContainer = $Panel/VBoxContainer/PanelsContainer/RightPanel
 @onready var status_label : HBoxContainer = $Panel/VBoxContainer/StatusLabel
 
-var active_panel : String= "left"  # or "right"
+var active_panel : String= "left"
 
 func _ready() -> void:
 	left_panel.set_path(OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP))
@@ -22,13 +22,17 @@ func _unhandled_input(event) -> void:
 
 func toggle_active_panel() -> void:
 	if active_panel == "left":
-		active_panel = "aright"
+		active_panel = "right"
+		left_panel.modulate  = Color(0.7, 0.7, 0.7)
 		left_panel.is_focused = false
+		right_panel.modulate = Color(1, 1, 1)
 		right_panel.is_focused = true
 		right_panel.grab_focus()
 	else:
 		active_panel = "left"
+		right_panel.modulate = Color(0.7, 0.7, 0.7)
 		right_panel.is_focused = false
+		left_panel.modulate  = Color(1, 1, 1)
 		left_panel.is_focused = true
 		left_panel.grab_focus()
 
