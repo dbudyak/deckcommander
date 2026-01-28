@@ -144,16 +144,17 @@ func _add_file_item(file_name: String, is_dir: bool) -> void:
 	btn.set_meta("file_name", file_name)
 	btn.set_meta("is_dir", is_dir)
 
-	# Disable horizontal focus neighbors so Tab doesn't navigate within panel
-	btn.focus_neighbor_left = btn.get_path()
-	btn.focus_neighbor_right = btn.get_path()
-
 	btn.pressed.connect(_on_file_pressed.bind(file_name, is_dir))
 	btn.focus_entered.connect(_on_file_focus_entered.bind(btn))
 
 	_update_button_style(btn, file_name)
 	file_list.add_child(btn)
 	file_buttons[file_name] = btn
+
+	# Disable horizontal focus neighbors so Tab doesn't navigate within panel
+	# Must be done after adding to tree so get_path() works
+	btn.focus_neighbor_left = btn.get_path()
+	btn.focus_neighbor_right = btn.get_path()
 
 
 func _get_file_icon(file_name: String) -> String:
