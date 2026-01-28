@@ -1,5 +1,5 @@
-extends Node
 class_name FileOperations
+extends RefCounted
 ## Utility class for file system operations.
 ##
 ## This class provides static methods for common file operations

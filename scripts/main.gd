@@ -24,9 +24,9 @@ extends Control
 # State
 # =============================================================================
 
-enum Panel { LEFT, RIGHT }
+enum PanelSide { LEFT, RIGHT }
 
-var _active_panel: Panel = Panel.LEFT
+var _active_panel: PanelSide = PanelSide.LEFT
 var _pending_operation: String = ""
 var _pending_files: Array[String] = []
 var _using_gamepad: bool = false
@@ -44,7 +44,7 @@ var _nav_repeating: bool = false
 func _ready() -> void:
 	_initialize_panels()
 	_connect_signals()
-	_set_active_panel(Panel.LEFT)
+	_set_active_panel(PanelSide.LEFT)
 	_update_status()
 	_update_hints()
 
@@ -177,10 +177,10 @@ func _is_dialog_open() -> bool:
 # Panel Management
 # =============================================================================
 
-func _set_active_panel(panel: Panel) -> void:
+func _set_active_panel(panel: PanelSide) -> void:
 	_active_panel = panel
 
-	if panel == Panel.LEFT:
+	if panel == PanelSide.LEFT:
 		_left_panel.modulate = Settings.PANEL_ACTIVE_COLOR
 		_left_panel.is_focused = true
 		_right_panel.modulate = Settings.PANEL_INACTIVE_COLOR
@@ -195,27 +195,27 @@ func _set_active_panel(panel: Panel) -> void:
 
 
 func _toggle_active_panel() -> void:
-	var new_panel := Panel.RIGHT if _active_panel == Panel.LEFT else Panel.LEFT
+	var new_panel := PanelSide.RIGHT if _active_panel == PanelSide.LEFT else PanelSide.LEFT
 	_set_active_panel(new_panel)
 	_get_active_panel().focus_panel()
 
 
 func _get_active_panel() -> FilePanel:
-	return _left_panel if _active_panel == Panel.LEFT else _right_panel
+	return _left_panel if _active_panel == PanelSide.LEFT else _right_panel
 
 
 func _get_inactive_panel() -> FilePanel:
-	return _right_panel if _active_panel == Panel.LEFT else _left_panel
+	return _right_panel if _active_panel == PanelSide.LEFT else _left_panel
 
 
 func _on_left_panel_focused() -> void:
-	if _active_panel != Panel.LEFT:
-		_set_active_panel(Panel.LEFT)
+	if _active_panel != PanelSide.LEFT:
+		_set_active_panel(PanelSide.LEFT)
 
 
 func _on_right_panel_focused() -> void:
-	if _active_panel != Panel.RIGHT:
-		_set_active_panel(Panel.RIGHT)
+	if _active_panel != PanelSide.RIGHT:
+		_set_active_panel(PanelSide.RIGHT)
 
 
 func _on_selection_changed(_selected: Array) -> void:
