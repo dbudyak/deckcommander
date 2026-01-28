@@ -15,11 +15,12 @@ var is_focused: bool = false
 var show_hidden_files: bool = false
 var selected_files: Array[String] = []
 var file_buttons: Dictionary = {}
+var _pending_focus_item: String = ""  # Item to focus after file list rebuild
 
 signal file_selected(file_name: String, is_dir: bool)
 signal path_changed(new_path: String)
 signal selection_changed(selected: Array[String])
-signal panel_focused()  # Emitted when this panel gains focus
+signal panel_focused()
 
 
 func _ready() -> void:
@@ -35,15 +36,29 @@ func _ready() -> void:
 	up_button.focus_entered.connect(_on_panel_focus_gained)
 	hidden_button.focus_entered.connect(_on_panel_focus_gained)
 
+	# Disable default focus neighbor navigation on toolbar buttons
+	# so Tab doesn't get consumed by Godot's focus system
+	_disable_focus_neighbors(home_button)
+	_disable_focus_neighbors(up_button)
+	_disable_focus_neighbors(hidden_button)
+
 	_update_hidden_button()
 	update_file_list()
 
 
-func set_path(path: String) -> void:
+func _disable_focus_neighbors(btn: Button) -> void:
+	btn.focus_neighbor_left = btn.get_path()
+	btn.focus_neighbor_right = btn.get_path()
+	btn.focus_next = btn.get_path()
+	btn.focus_previous = btn.get_path()
+
+
+func set_path(path: String, focus_item: String = "") -> void:
 	if not DirAccess.dir_exists_absolute(path):
 		return
 	current_path = path
 	selected_files.clear()
+	_pending_focus_item = focus_item
 	update_file_list()
 	path_changed.emit(current_path)
 
@@ -93,10 +108,14 @@ func update_file_list() -> void:
 	for fname in files:
 		_add_file_item(fname, false)
 
-	# Focus first item if available
+	# Focus appropriate item after frame (buttons need to be ready)
 	await get_tree().process_frame
 	if is_focused:
-		_focus_first_item()
+		if not _pending_focus_item.is_empty() and _pending_focus_item in file_buttons:
+			(file_buttons[_pending_focus_item] as Button).grab_focus()
+		else:
+			_focus_first_item()
+	_pending_focus_item = ""
 
 
 func _sort_case_insensitive(a: String, b: String) -> bool:
@@ -124,6 +143,10 @@ func _add_file_item(file_name: String, is_dir: bool) -> void:
 	btn.focus_mode = Control.FOCUS_ALL
 	btn.set_meta("file_name", file_name)
 	btn.set_meta("is_dir", is_dir)
+
+	# Disable horizontal focus neighbors so Tab doesn't navigate within panel
+	btn.focus_neighbor_left = btn.get_path()
+	btn.focus_neighbor_right = btn.get_path()
 
 	btn.pressed.connect(_on_file_pressed.bind(file_name, is_dir))
 	btn.focus_entered.connect(_on_file_focus_entered.bind(btn))
@@ -188,9 +211,7 @@ func _on_file_pressed(file_name: String, is_dir: bool) -> void:
 
 
 func _on_file_focus_entered(btn: Button) -> void:
-	# Notify that this panel gained focus
 	_on_panel_focus_gained()
-	# Ensure the focused button is visible in scroll container
 	await get_tree().process_frame
 	scroll_container.ensure_control_visible(btn)
 
@@ -268,29 +289,19 @@ func is_focused_item_directory() -> bool:
 func go_up() -> void:
 	var parent := current_path.get_base_dir()
 	if parent != current_path and not parent.is_empty():
-		# Remember current directory name to focus it after going up
 		var current_dir_name := current_path.get_file()
-		set_path(parent)
-		# Focus the directory we just came from
-		_focus_item(current_dir_name)
+		set_path(parent, current_dir_name)
 
 
 func focus_panel() -> void:
 	_focus_first_item()
-	# Emit focus signal even if empty (for panel tracking)
 	_on_panel_focus_gained()
-
-
-func _focus_item(item_name: String) -> void:
-	if item_name in file_buttons:
-		(file_buttons[item_name] as Button).grab_focus()
-	else:
-		_focus_first_item()
 
 
 func refresh() -> void:
 	var old_selected := selected_files.duplicate()
 	var old_focused := get_focused_file()
+	_pending_focus_item = old_focused
 
 	update_file_list()
 
@@ -299,10 +310,6 @@ func refresh() -> void:
 		if file_name in file_buttons:
 			selected_files.append(file_name)
 			_update_button_style(file_buttons[file_name], file_name)
-
-	# Try to restore focus
-	if old_focused in file_buttons:
-		(file_buttons[old_focused] as Button).grab_focus()
 
 
 func has_focus_in_panel() -> bool:
@@ -325,7 +332,6 @@ func _focus_first_item() -> void:
 		if first:
 			first.grab_focus()
 	else:
-		# Empty directory - focus the up button so panel still works
 		up_button.grab_focus()
 
 

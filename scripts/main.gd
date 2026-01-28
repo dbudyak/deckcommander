@@ -93,16 +93,19 @@ func _input(event: InputEvent) -> void:
 		nav_direction = 0
 		nav_repeating = false
 
+	# Handle Tab/panel switch here in _input so it's not consumed by focus system
+	if not confirm_dialog.visible and not input_dialog.visible:
+		if event.is_action_pressed("ui_focus_next"):
+			_toggle_active_panel()
+			get_viewport().set_input_as_handled()
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if confirm_dialog.visible or input_dialog.visible:
 		return
 
-	# Handle actions
-	if event.is_action_pressed("ui_focus_next"):
-		_toggle_active_panel()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_cancel") or event.is_action_pressed("ui_text_backspace"):
+	# Handle actions (Tab is handled in _input to intercept before focus system)
+	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("ui_text_backspace"):
 		_get_active_panel().go_up()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("select_file"):
