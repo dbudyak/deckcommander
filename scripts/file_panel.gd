@@ -19,6 +19,7 @@ var file_buttons: Dictionary = {}
 signal file_selected(file_name: String, is_dir: bool)
 signal path_changed(new_path: String)
 signal selection_changed(selected: Array[String])
+signal panel_focused()  # Emitted when this panel gains focus
 
 
 func _ready() -> void:
@@ -28,6 +29,11 @@ func _ready() -> void:
 	home_button.pressed.connect(_on_home_pressed)
 	up_button.pressed.connect(_on_up_pressed)
 	hidden_button.pressed.connect(_on_hidden_pressed)
+
+	# Connect toolbar button focus to panel focus
+	home_button.focus_entered.connect(_on_panel_focus_gained)
+	up_button.focus_entered.connect(_on_panel_focus_gained)
+	hidden_button.focus_entered.connect(_on_panel_focus_gained)
 
 	_update_hidden_button()
 	update_file_list()
@@ -89,7 +95,8 @@ func update_file_list() -> void:
 
 	# Focus first item if available
 	await get_tree().process_frame
-	_focus_first_item()
+	if is_focused:
+		_focus_first_item()
 
 
 func _sort_case_insensitive(a: String, b: String) -> bool:
@@ -101,14 +108,14 @@ func _add_file_item(file_name: String, is_dir: bool) -> void:
 
 	# Get file info
 	var full_path := current_path.path_join(file_name)
-	var icon := "📁 " if is_dir else "📄 "
+	var icon := "📁 " if is_dir else _get_file_icon(file_name)
 	var size_text := ""
 
 	if not is_dir:
 		var file := FileAccess.open(full_path, FileAccess.READ)
 		if file:
 			var size := file.get_length()
-			size_text = "  [%s]" % _format_size(size)
+			size_text = "  %s" % _format_size(size)
 			file.close()
 
 	btn.text = icon + file_name + size_text
@@ -126,6 +133,31 @@ func _add_file_item(file_name: String, is_dir: bool) -> void:
 	file_buttons[file_name] = btn
 
 
+func _get_file_icon(file_name: String) -> String:
+	var ext := file_name.get_extension().to_lower()
+	match ext:
+		"png", "jpg", "jpeg", "gif", "webp", "svg", "bmp":
+			return "🖼️ "
+		"mp3", "wav", "ogg", "flac", "m4a":
+			return "🎵 "
+		"mp4", "mkv", "avi", "mov", "webm":
+			return "🎬 "
+		"zip", "tar", "gz", "7z", "rar":
+			return "📦 "
+		"exe", "app", "sh", "bin":
+			return "⚡ "
+		"pdf":
+			return "📕 "
+		"txt", "md", "log":
+			return "📝 "
+		"gd", "py", "js", "ts", "rs", "go", "c", "cpp", "h":
+			return "💻 "
+		"json", "xml", "yaml", "toml", "ini", "cfg":
+			return "⚙️ "
+		_:
+			return "📄 "
+
+
 func _format_size(bytes: int) -> String:
 	if bytes < 1024:
 		return "%d B" % bytes
@@ -139,9 +171,9 @@ func _format_size(bytes: int) -> String:
 
 func _update_button_style(btn: Button, file_name: String) -> void:
 	if file_name in selected_files:
-		btn.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
-		btn.add_theme_color_override("font_focus_color", Color(0.3, 1.0, 0.3))
-		btn.add_theme_color_override("font_hover_color", Color(0.4, 1.0, 0.4))
+		btn.add_theme_color_override("font_color", Color(0.2, 1.0, 0.4))
+		btn.add_theme_color_override("font_focus_color", Color(0.4, 1.0, 0.6))
+		btn.add_theme_color_override("font_hover_color", Color(0.3, 1.0, 0.5))
 	else:
 		btn.remove_theme_color_override("font_color")
 		btn.remove_theme_color_override("font_focus_color")
@@ -156,9 +188,15 @@ func _on_file_pressed(file_name: String, is_dir: bool) -> void:
 
 
 func _on_file_focus_entered(btn: Button) -> void:
+	# Notify that this panel gained focus
+	_on_panel_focus_gained()
 	# Ensure the focused button is visible in scroll container
 	await get_tree().process_frame
 	scroll_container.ensure_control_visible(btn)
+
+
+func _on_panel_focus_gained() -> void:
+	panel_focused.emit()
 
 
 func toggle_selection() -> void:
@@ -254,6 +292,13 @@ func refresh() -> void:
 		(file_buttons[old_focused] as Button).grab_focus()
 
 
+func has_focus_in_panel() -> bool:
+	var focused := get_viewport().gui_get_focus_owner()
+	if focused == null:
+		return false
+	return focused == home_button or focused == up_button or focused == hidden_button or (focused is Button and focused.has_meta("file_name") and focused.get_parent() == file_list)
+
+
 func _get_focused_button() -> Button:
 	var focused := get_viewport().gui_get_focus_owner()
 	if focused is Button and focused.has_meta("file_name"):
@@ -283,12 +328,11 @@ func _on_hidden_pressed() -> void:
 
 
 func _update_hidden_button() -> void:
-	hidden_button.text = "👁" if show_hidden_files else "👁‍🗨"
+	hidden_button.text = "👁" if show_hidden_files else "◌"
 	hidden_button.tooltip_text = "Hide hidden files" if show_hidden_files else "Show hidden files"
 
 
 func _get_home_directory() -> String:
-	# Try common paths
 	var home := OS.get_environment("HOME")
 	if not home.is_empty() and DirAccess.dir_exists_absolute(home):
 		return home

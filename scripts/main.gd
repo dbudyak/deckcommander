@@ -11,13 +11,25 @@ extends Control
 @onready var input_line_edit: LineEdit = $InputDialog/VBoxContainer/LineEdit
 @onready var input_ok_button: Button = $InputDialog/VBoxContainer/HBoxContainer/OkButton
 @onready var input_cancel_button: Button = $InputDialog/VBoxContainer/HBoxContainer/CancelButton
+@onready var panel_container: HBoxContainer = $Panel/VBoxContainer/PanelsContainer
 
 var active_panel: String = "left"
 var pending_operation: String = ""
 var pending_files: Array[String] = []
+var using_gamepad: bool = false
 
-const INACTIVE_COLOR := Color(0.6, 0.6, 0.6)
+# Navigation repeat
+var nav_repeat_timer: float = 0.0
+var nav_repeat_delay: float = 0.4  # Initial delay before repeat starts
+var nav_repeat_rate: float = 0.08  # Time between repeats
+var nav_direction: int = 0  # -1 = up, 1 = down, 0 = none
+var nav_repeating: bool = false
+
+# Colors for the gaming aesthetic
 const ACTIVE_COLOR := Color(1.0, 1.0, 1.0)
+const INACTIVE_COLOR := Color(0.5, 0.5, 0.6)
+const ACCENT_COLOR := Color(0.0, 0.85, 1.0)  # Cyan
+const ACCENT_COLOR_2 := Color(1.0, 0.4, 0.7)  # Pink/Magenta
 
 
 func _ready() -> void:
@@ -26,7 +38,10 @@ func _ready() -> void:
 	left_panel.set_path(home)
 	right_panel.set_path(home)
 
-	# Connect signals
+	# Connect panel focus signals - THIS IS KEY FOR PROPER FOCUS TRACKING
+	left_panel.panel_focused.connect(_on_left_panel_focused)
+	right_panel.panel_focused.connect(_on_right_panel_focused)
+
 	left_panel.selection_changed.connect(_on_selection_changed)
 	right_panel.selection_changed.connect(_on_selection_changed)
 
@@ -40,12 +55,50 @@ func _ready() -> void:
 	# Set initial focus to left panel
 	_set_active_panel("left")
 	_update_status()
+	_update_hints()
+
+
+func _process(delta: float) -> void:
+	# Handle navigation repeat when holding down/up
+	if nav_direction != 0:
+		nav_repeat_timer += delta
+		var threshold := nav_repeat_delay if not nav_repeating else nav_repeat_rate
+		if nav_repeat_timer >= threshold:
+			nav_repeat_timer = 0.0
+			nav_repeating = true
+			_move_focus(nav_direction)
+
+
+func _input(event: InputEvent) -> void:
+	# Detect if using gamepad or keyboard
+	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+		if not using_gamepad:
+			using_gamepad = true
+			_update_hints()
+	elif event is InputEventKey:
+		if using_gamepad:
+			using_gamepad = false
+			_update_hints()
+
+	# Track navigation key hold state
+	if event.is_action_pressed("ui_down"):
+		nav_direction = 1
+		nav_repeat_timer = 0.0
+		nav_repeating = false
+	elif event.is_action_pressed("ui_up"):
+		nav_direction = -1
+		nav_repeat_timer = 0.0
+		nav_repeating = false
+	elif event.is_action_released("ui_down") or event.is_action_released("ui_up"):
+		nav_direction = 0
+		nav_repeating = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if confirm_dialog.visible or input_dialog.visible:
 		return
 
+	# Handle actions
 	if event.is_action_pressed("ui_focus_next"):
 		_toggle_active_panel()
 		get_viewport().set_input_as_handled()
@@ -81,6 +134,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+func _on_left_panel_focused() -> void:
+	if active_panel != "left":
+		_set_active_panel("left")
+
+
+func _on_right_panel_focused() -> void:
+	if active_panel != "right":
+		_set_active_panel("right")
+
+
 func _set_active_panel(panel_name: String) -> void:
 	active_panel = panel_name
 
@@ -89,19 +152,19 @@ func _set_active_panel(panel_name: String) -> void:
 		left_panel.is_focused = true
 		right_panel.modulate = INACTIVE_COLOR
 		right_panel.is_focused = false
-		left_panel.focus_panel()
 	else:
 		right_panel.modulate = ACTIVE_COLOR
 		right_panel.is_focused = true
 		left_panel.modulate = INACTIVE_COLOR
 		left_panel.is_focused = false
-		right_panel.focus_panel()
 
 	_update_status()
 
 
 func _toggle_active_panel() -> void:
-	_set_active_panel("right" if active_panel == "left" else "left")
+	var new_panel := "right" if active_panel == "left" else "left"
+	_set_active_panel(new_panel)
+	_get_active_panel().focus_panel()
 
 
 func _get_active_panel() -> FilePanel:
@@ -121,13 +184,20 @@ func _update_status() -> void:
 	var selected := panel.get_selected_files()
 
 	if selected.size() > 0:
-		status_label.text = "%d item(s) selected" % selected.size()
+		status_label.text = "✨ %d item(s) selected" % selected.size()
 	else:
 		var focused := panel.get_focused_file()
 		if not focused.is_empty():
-			status_label.text = focused
+			status_label.text = "► " + focused
 		else:
-			status_label.text = "Ready"
+			status_label.text = "🎮 Ready"
+
+
+func _update_hints() -> void:
+	if using_gamepad:
+		hints_label.text = "Ⓧ Sel  Ⓨ Copy  ☰ Move  ⊞ Del  LB/RB Switch"
+	else:
+		hints_label.text = "Ins:Sel  F2:Ren  F5:Copy  F6:Move  F7:Mkdir  F8:Del  Tab:Switch"
 
 
 func _show_status(message: String) -> void:
@@ -144,7 +214,7 @@ func _copy_files() -> void:
 	var files := source.get_files_for_operation()
 
 	if files.is_empty():
-		_show_status("No files to copy")
+		_show_status("⚠ No files to copy")
 		return
 
 	var source_path := source.current_path
@@ -166,9 +236,9 @@ func _copy_files() -> void:
 	source.deselect_all()
 
 	if failed == 0:
-		_show_status("Copied %d item(s)" % success)
+		_show_status("✅ Copied %d item(s)" % success)
 	else:
-		_show_status("Copied %d, failed %d" % [success, failed])
+		_show_status("⚠ Copied %d, failed %d" % [success, failed])
 
 
 func _copy_item(src: String, dst: String) -> bool:
@@ -215,7 +285,7 @@ func _move_files() -> void:
 	var files := source.get_files_for_operation()
 
 	if files.is_empty():
-		_show_status("No files to move")
+		_show_status("⚠ No files to move")
 		return
 
 	pending_operation = "move"
@@ -229,12 +299,12 @@ func _delete_files() -> void:
 	var files := source.get_files_for_operation()
 
 	if files.is_empty():
-		_show_status("No files to delete")
+		_show_status("⚠ No files to delete")
 		return
 
 	pending_operation = "delete"
 	pending_files = files.duplicate()
-	confirm_dialog.dialog_text = "Delete %d item(s)?\nThis cannot be undone!" % files.size()
+	confirm_dialog.dialog_text = "🗑️ Delete %d item(s)?\nThis cannot be undone!" % files.size()
 	confirm_dialog.popup_centered()
 
 
@@ -243,12 +313,12 @@ func _rename_file() -> void:
 	var focused := panel.get_focused_file()
 
 	if focused.is_empty():
-		_show_status("No file selected")
+		_show_status("⚠ No file selected")
 		return
 
 	pending_operation = "rename"
 	pending_files = [focused]
-	input_dialog.title = "Rename"
+	input_dialog.title = "✏️ Rename"
 	input_line_edit.text = focused
 	input_line_edit.select_all()
 	input_dialog.popup_centered()
@@ -258,7 +328,7 @@ func _rename_file() -> void:
 func _create_directory() -> void:
 	pending_operation = "mkdir"
 	pending_files.clear()
-	input_dialog.title = "Create Directory"
+	input_dialog.title = "📁 Create Directory"
 	input_line_edit.text = ""
 	input_dialog.popup_centered()
 	input_line_edit.grab_focus()
@@ -278,7 +348,7 @@ func _on_confirm_dialog_confirmed() -> void:
 func _on_confirm_dialog_canceled() -> void:
 	pending_operation = ""
 	pending_files.clear()
-	_show_status("Cancelled")
+	_show_status("❌ Cancelled")
 
 
 func _on_input_confirmed() -> void:
@@ -286,7 +356,7 @@ func _on_input_confirmed() -> void:
 	input_dialog.hide()
 
 	if text.is_empty():
-		_show_status("Name cannot be empty")
+		_show_status("⚠ Name cannot be empty")
 		pending_operation = ""
 		pending_files.clear()
 		return
@@ -305,10 +375,10 @@ func _on_input_canceled() -> void:
 	input_dialog.hide()
 	pending_operation = ""
 	pending_files.clear()
-	_show_status("Cancelled")
+	_show_status("❌ Cancelled")
 
 
-func _on_input_text_submitted(text: String) -> void:
+func _on_input_text_submitted(_text: String) -> void:
 	_on_input_confirmed()
 
 
@@ -330,9 +400,9 @@ func _execute_delete() -> void:
 	source.refresh()
 
 	if failed == 0:
-		_show_status("Deleted %d item(s)" % success)
+		_show_status("🗑️ Deleted %d item(s)" % success)
 	else:
-		_show_status("Deleted %d, failed %d" % [success, failed])
+		_show_status("⚠ Deleted %d, failed %d" % [success, failed])
 
 
 func _delete_item(path: String) -> bool:
@@ -396,9 +466,9 @@ func _execute_move() -> void:
 	dest.refresh()
 
 	if failed == 0:
-		_show_status("Moved %d item(s)" % success)
+		_show_status("📦 Moved %d item(s)" % success)
 	else:
-		_show_status("Moved %d, failed %d" % [success, failed])
+		_show_status("⚠ Moved %d, failed %d" % [success, failed])
 
 
 func _execute_rename(new_name: String) -> void:
@@ -411,18 +481,18 @@ func _execute_rename(new_name: String) -> void:
 	var new_path := panel.current_path.path_join(new_name)
 
 	if old_name == new_name:
-		_show_status("Name unchanged")
+		_show_status("⚠ Name unchanged")
 		return
 
 	if FileAccess.file_exists(new_path) or DirAccess.dir_exists_absolute(new_path):
-		_show_status("Name already exists")
+		_show_status("⚠ Name already exists")
 		return
 
 	if DirAccess.rename_absolute(old_path, new_path) == OK:
 		panel.refresh()
-		_show_status("Renamed to: " + new_name)
+		_show_status("✏️ Renamed to: " + new_name)
 	else:
-		_show_status("Rename failed")
+		_show_status("❌ Rename failed")
 
 
 func _execute_mkdir(dir_name: String) -> void:
@@ -430,20 +500,20 @@ func _execute_mkdir(dir_name: String) -> void:
 	var new_path := panel.current_path.path_join(dir_name)
 
 	if DirAccess.dir_exists_absolute(new_path):
-		_show_status("Directory already exists")
+		_show_status("⚠ Directory already exists")
 		return
 
 	if DirAccess.make_dir_absolute(new_path) == OK:
 		panel.refresh()
-		_show_status("Created: " + dir_name)
+		_show_status("📁 Created: " + dir_name)
 	else:
-		_show_status("Failed to create directory")
+		_show_status("❌ Failed to create directory")
 
 
 func _refresh_panels() -> void:
 	left_panel.refresh()
 	right_panel.refresh()
-	_show_status("Refreshed")
+	_show_status("🔄 Refreshed")
 
 
 func _get_start_directory() -> String:
@@ -451,3 +521,22 @@ func _get_start_directory() -> String:
 	if not home.is_empty() and DirAccess.dir_exists_absolute(home):
 		return home
 	return OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP)
+
+
+func _move_focus(direction: int) -> void:
+	var focused := get_viewport().gui_get_focus_owner()
+	if focused == null:
+		return
+
+	var panel := _get_active_panel()
+	var file_list := panel.file_list
+
+	# Check if focus is on a file button
+	if focused.get_parent() == file_list:
+		var idx := focused.get_index()
+		var new_idx := idx + direction
+
+		if new_idx >= 0 and new_idx < file_list.get_child_count():
+			var next_btn := file_list.get_child(new_idx) as Button
+			if next_btn:
+				next_btn.grab_focus()
