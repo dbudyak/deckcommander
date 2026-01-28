@@ -4,6 +4,8 @@ extends Control
 ## Manages the two file panels, handles global input, and coordinates
 ## file operations between panels.
 
+const FileOperations = preload("res://scripts/file_operations.gd")
+
 
 # =============================================================================
 # Node References

@@ -5,6 +5,8 @@ class_name FilePanel
 ## This component displays a list of files and directories, supports
 ## single and multi-selection, and emits signals for user interactions.
 
+const FileOperations = preload("res://scripts/file_operations.gd")
+
 
 # =============================================================================
 # Signals

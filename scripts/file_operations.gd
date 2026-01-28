@@ -1,4 +1,3 @@
-class_name FileOperations
 extends RefCounted
 ## Utility class for file system operations.
 ##
