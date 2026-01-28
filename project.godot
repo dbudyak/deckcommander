@@ -16,6 +16,10 @@ config/features=PackedStringArray("4.4", "GL Compatibility")
 run/max_fps=90
 config/icon="res://assets/icons/icon.svg"
 
+[autoload]
+
+Settings="*res://scripts/settings.gd"
+
 [display]
 
 window/size/viewport_width=1920

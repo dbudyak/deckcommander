@@ -1,84 +1,258 @@
 extends VBoxContainer
 class_name FilePanel
+## A dual-panel file browser component with selection support.
+##
+## This component displays a list of files and directories, supports
+## single and multi-selection, and emits signals for user interactions.
 
-## A file browser panel component with selection support.
 
-@onready var current_path_label: Label = $CurrentPathLabel
-@onready var file_list: VBoxContainer = $ScrollContainer/FileList
-@onready var home_button: Button = $HBoxContainer/HomeButton
-@onready var up_button: Button = $HBoxContainer/UpButton
-@onready var hidden_button: Button = $HBoxContainer/HiddenButton
-@onready var scroll_container: ScrollContainer = $ScrollContainer
+# =============================================================================
+# Signals
+# =============================================================================
 
-var current_path: String = ""
-var is_focused: bool = false
-var show_hidden_files: bool = false
-var selected_files: Array[String] = []
-var file_buttons: Dictionary = {}
-var _pending_focus_item: String = ""  # Item to focus after file list rebuild
+## Emitted when a file (not directory) is activated.
+signal file_activated(file_path: String)
 
-signal file_selected(file_name: String, is_dir: bool)
+## Emitted when the current directory changes.
 signal path_changed(new_path: String)
-signal selection_changed(selected: Array[String])
+
+## Emitted when the selection changes.
+signal selection_changed(selected_files: Array[String])
+
+## Emitted when this panel gains focus.
 signal panel_focused()
 
 
+# =============================================================================
+# Node References
+# =============================================================================
+
+@onready var _path_label: Label = $CurrentPathLabel
+@onready var _file_list: VBoxContainer = $ScrollContainer/FileList
+@onready var _home_button: Button = $HBoxContainer/HomeButton
+@onready var _up_button: Button = $HBoxContainer/UpButton
+@onready var _hidden_button: Button = $HBoxContainer/HiddenButton
+@onready var _scroll_container: ScrollContainer = $ScrollContainer
+
+
+# =============================================================================
+# State
+# =============================================================================
+
+## Current directory path being displayed.
+var current_path: String = ""
+
+## Whether this panel currently has focus.
+var is_focused: bool = false
+
+## Whether to show hidden files (starting with dot).
+var show_hidden_files: bool = false
+
+## Currently selected file names.
+var _selected_files: Array[String] = []
+
+## Map of file_name -> Button for quick lookup.
+var _file_buttons: Dictionary = {}
+
+## Item to focus after file list rebuild.
+var _pending_focus_item: String = ""
+
+
+# =============================================================================
+# Lifecycle
+# =============================================================================
+
 func _ready() -> void:
 	if current_path.is_empty():
-		current_path = _get_home_directory()
+		current_path = FileOperations.get_home_directory()
 
-	home_button.pressed.connect(_on_home_pressed)
-	up_button.pressed.connect(_on_up_pressed)
-	hidden_button.pressed.connect(_on_hidden_pressed)
-
-	# Connect toolbar button focus to panel focus
-	home_button.focus_entered.connect(_on_panel_focus_gained)
-	up_button.focus_entered.connect(_on_panel_focus_gained)
-	hidden_button.focus_entered.connect(_on_panel_focus_gained)
-
-	# Disable default focus neighbor navigation on toolbar buttons
-	# so Tab doesn't get consumed by Godot's focus system
-	_disable_focus_neighbors(home_button)
-	_disable_focus_neighbors(up_button)
-	_disable_focus_neighbors(hidden_button)
-
-	_update_hidden_button()
-	update_file_list()
+	_connect_toolbar_signals()
+	_update_hidden_button_display()
+	refresh_file_list()
 
 
-func _disable_focus_neighbors(btn: Button) -> void:
+func _connect_toolbar_signals() -> void:
+	_home_button.pressed.connect(_on_home_pressed)
+	_up_button.pressed.connect(_on_up_pressed)
+	_hidden_button.pressed.connect(_on_hidden_pressed)
+
+	# Track panel focus from toolbar buttons
+	_home_button.focus_entered.connect(_emit_panel_focused)
+	_up_button.focus_entered.connect(_emit_panel_focused)
+	_hidden_button.focus_entered.connect(_emit_panel_focused)
+
+	# Disable Tab navigation on toolbar to let main handle it
+	_disable_button_focus_neighbors(_home_button)
+	_disable_button_focus_neighbors(_up_button)
+	_disable_button_focus_neighbors(_hidden_button)
+
+
+func _disable_button_focus_neighbors(btn: Button) -> void:
 	btn.focus_neighbor_left = btn.get_path()
 	btn.focus_neighbor_right = btn.get_path()
 	btn.focus_next = btn.get_path()
 	btn.focus_previous = btn.get_path()
 
 
-func set_path(path: String, focus_item: String = "") -> void:
+# =============================================================================
+# Public API
+# =============================================================================
+
+## Changes the current directory and refreshes the file list.
+func set_directory(path: String, focus_item: String = "") -> void:
 	if not DirAccess.dir_exists_absolute(path):
+		push_warning("FilePanel: Directory does not exist: %s" % path)
 		return
+
 	current_path = path
-	selected_files.clear()
+	_selected_files.clear()
 	_pending_focus_item = focus_item
-	update_file_list()
+	refresh_file_list()
 	path_changed.emit(current_path)
 
 
-func update_file_list() -> void:
-	# Clear existing items
-	for child in file_list.get_children():
-		child.queue_free()
-	file_buttons.clear()
+## Navigates to the parent directory.
+func go_up() -> void:
+	var parent := current_path.get_base_dir()
+	if parent != current_path and not parent.is_empty():
+		var current_dir_name := current_path.get_file()
+		set_directory(parent, current_dir_name)
 
-	# Update path display
-	current_path_label.text = current_path
 
-	# Open directory
-	var dir := DirAccess.open(current_path)
-	if dir == null:
-		current_path_label.text = "Error: " + str(DirAccess.get_open_error())
+## Navigates to the home directory.
+func go_home() -> void:
+	set_directory(FileOperations.get_home_directory())
+
+
+## Refreshes the file list, preserving selection where possible.
+func refresh() -> void:
+	var old_selected := _selected_files.duplicate()
+	var old_focused := get_focused_file_name()
+	_pending_focus_item = old_focused
+
+	refresh_file_list()
+
+	# Restore selection for files that still exist
+	for file_name in old_selected:
+		if file_name in _file_buttons:
+			_selected_files.append(file_name)
+			_update_button_selection_style(_file_buttons[file_name], file_name)
+
+
+## Gives focus to this panel.
+func focus_panel() -> void:
+	_focus_first_item()
+	_emit_panel_focused()
+
+
+## Toggles selection on the currently focused file.
+func toggle_selection() -> void:
+	var btn := _get_focused_file_button()
+	if btn == null:
 		return
 
-	# Collect files and directories
+	var file_name: String = btn.get_meta("file_name")
+	_toggle_file_selection(file_name, btn)
+
+	# Move focus to next item
+	_focus_next_item(btn)
+
+
+## Selects all files in the current directory.
+func select_all() -> void:
+	_selected_files.clear()
+	for file_name in _file_buttons.keys():
+		_selected_files.append(file_name)
+		_update_button_selection_style(_file_buttons[file_name], file_name)
+	selection_changed.emit(_selected_files)
+
+
+## Clears all selections.
+func deselect_all() -> void:
+	for file_name in _selected_files:
+		if file_name in _file_buttons:
+			_update_button_selection_style(_file_buttons[file_name], file_name)
+	_selected_files.clear()
+	selection_changed.emit(_selected_files)
+
+
+## Returns the list of selected file names.
+func get_selected_files() -> Array[String]:
+	return _selected_files
+
+
+## Returns the focused file name, or empty string if none.
+func get_focused_file_name() -> String:
+	var btn := _get_focused_file_button()
+	if btn:
+		return btn.get_meta("file_name")
+	return ""
+
+
+## Returns files for an operation (selected files, or focused file if none selected).
+func get_files_for_operation() -> Array[String]:
+	if _selected_files.size() > 0:
+		return _selected_files.duplicate()
+	var focused := get_focused_file_name()
+	if not focused.is_empty():
+		return [focused]
+	return []
+
+
+## Returns whether the focused item is a directory.
+func is_focused_item_directory() -> bool:
+	var btn := _get_focused_file_button()
+	if btn and btn.has_meta("is_dir"):
+		return btn.get_meta("is_dir")
+	return false
+
+
+## Returns whether any element within this panel has focus.
+func has_focus_in_panel() -> bool:
+	var focused := get_viewport().gui_get_focus_owner()
+	if focused == null:
+		return false
+
+	if focused in [_home_button, _up_button, _hidden_button]:
+		return true
+
+	return focused is Button and focused.has_meta("file_name") and focused.get_parent() == _file_list
+
+
+## Provides access to the file list container (for focus management).
+var file_list: VBoxContainer:
+	get:
+		return _file_list
+
+
+# =============================================================================
+# File List Management
+# =============================================================================
+
+func refresh_file_list() -> void:
+	_clear_file_list()
+	_path_label.text = current_path
+
+	var dir := DirAccess.open(current_path)
+	if dir == null:
+		_path_label.text = "Error: " + str(DirAccess.get_open_error())
+		return
+
+	var entries := _collect_directory_entries(dir)
+	_populate_file_list(entries.dirs, entries.files)
+
+	# Focus appropriate item after the tree is ready
+	await get_tree().process_frame
+	_apply_pending_focus()
+
+
+func _clear_file_list() -> void:
+	for child in _file_list.get_children():
+		child.queue_free()
+	_file_buttons.clear()
+
+
+func _collect_directory_entries(dir: DirAccess) -> Dictionary:
 	var dirs: Array[String] = []
 	var files: Array[String] = []
 
@@ -94,250 +268,151 @@ func update_file_list() -> void:
 				else:
 					files.append(file_name)
 		file_name = dir.get_next()
+
 	dir.list_dir_end()
 
-	# Sort alphabetically (case-insensitive)
-	dirs.sort_custom(_sort_case_insensitive)
-	files.sort_custom(_sort_case_insensitive)
+	# Sort case-insensitive
+	dirs.sort_custom(func(a, b): return a.to_lower() < b.to_lower())
+	files.sort_custom(func(a, b): return a.to_lower() < b.to_lower())
 
-	# Add directory items first
+	return { "dirs": dirs, "files": files }
+
+
+func _populate_file_list(dirs: Array[String], files: Array[String]) -> void:
 	for dir_name in dirs:
-		_add_file_item(dir_name, true)
+		_create_file_button(dir_name, true)
 
-	# Add file items
-	for fname in files:
-		_add_file_item(fname, false)
-
-	# Focus appropriate item after frame (buttons need to be ready)
-	await get_tree().process_frame
-	if is_focused:
-		if not _pending_focus_item.is_empty() and _pending_focus_item in file_buttons:
-			(file_buttons[_pending_focus_item] as Button).grab_focus()
-		else:
-			_focus_first_item()
-	_pending_focus_item = ""
+	for file_name in files:
+		_create_file_button(file_name, false)
 
 
-func _sort_case_insensitive(a: String, b: String) -> bool:
-	return a.to_lower() < b.to_lower()
-
-
-func _add_file_item(file_name: String, is_dir: bool) -> void:
+func _create_file_button(file_name: String, is_dir: bool) -> void:
 	var btn := Button.new()
 
-	# Get file info
-	var full_path := current_path.path_join(file_name)
-	var icon := "📁 " if is_dir else _get_file_icon(file_name)
-	var size_text := ""
+	# Build display text
+	var icon := "📁" if is_dir else FileOperations.get_file_icon(file_name)
+	var size_text := _get_file_size_text(file_name) if not is_dir else ""
+	btn.text = "%s %s%s" % [icon, file_name, size_text]
 
-	if not is_dir:
-		var file := FileAccess.open(full_path, FileAccess.READ)
-		if file:
-			var size := file.get_length()
-			size_text = "  %s" % _format_size(size)
-			file.close()
-
-	btn.text = icon + file_name + size_text
+	# Configure button
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	btn.focus_mode = Control.FOCUS_ALL
 	btn.set_meta("file_name", file_name)
 	btn.set_meta("is_dir", is_dir)
 
-	btn.pressed.connect(_on_file_pressed.bind(file_name, is_dir))
-	btn.focus_entered.connect(_on_file_focus_entered.bind(btn))
+	# Connect signals
+	btn.pressed.connect(_on_file_button_pressed.bind(file_name, is_dir))
+	btn.focus_entered.connect(_on_file_button_focus_entered.bind(btn))
 
-	_update_button_style(btn, file_name)
-	file_list.add_child(btn)
-	file_buttons[file_name] = btn
+	# Apply selection style if previously selected
+	_update_button_selection_style(btn, file_name)
 
-	# Disable horizontal focus neighbors so Tab doesn't navigate within panel
-	# Must be done after adding to tree so get_path() works
+	# Add to tree
+	_file_list.add_child(btn)
+	_file_buttons[file_name] = btn
+
+	# Disable horizontal focus (must be after adding to tree)
 	btn.focus_neighbor_left = btn.get_path()
 	btn.focus_neighbor_right = btn.get_path()
 
 
-func _get_file_icon(file_name: String) -> String:
-	var ext := file_name.get_extension().to_lower()
-	match ext:
-		"png", "jpg", "jpeg", "gif", "webp", "svg", "bmp":
-			return "🖼️ "
-		"mp3", "wav", "ogg", "flac", "m4a":
-			return "🎵 "
-		"mp4", "mkv", "avi", "mov", "webm":
-			return "🎬 "
-		"zip", "tar", "gz", "7z", "rar":
-			return "📦 "
-		"exe", "app", "sh", "bin":
-			return "⚡ "
-		"pdf":
-			return "📕 "
-		"txt", "md", "log":
-			return "📝 "
-		"gd", "py", "js", "ts", "rs", "go", "c", "cpp", "h":
-			return "💻 "
-		"json", "xml", "yaml", "toml", "ini", "cfg":
-			return "⚙️ "
-		_:
-			return "📄 "
+func _get_file_size_text(file_name: String) -> String:
+	var full_path := current_path.path_join(file_name)
+	var file := FileAccess.open(full_path, FileAccess.READ)
+	if file:
+		var size := file.get_length()
+		file.close()
+		return "  %s" % FileOperations.format_size(size)
+	return ""
 
 
-func _format_size(bytes: int) -> String:
-	if bytes < 1024:
-		return "%d B" % bytes
-	elif bytes < 1024 * 1024:
-		return "%.1f KB" % (bytes / 1024.0)
-	elif bytes < 1024 * 1024 * 1024:
-		return "%.1f MB" % (bytes / 1024.0 / 1024.0)
+func _apply_pending_focus() -> void:
+	if is_focused:
+		if not _pending_focus_item.is_empty() and _pending_focus_item in _file_buttons:
+			(_file_buttons[_pending_focus_item] as Button).grab_focus()
+		else:
+			_focus_first_item()
+	_pending_focus_item = ""
+
+
+# =============================================================================
+# Selection Management
+# =============================================================================
+
+func _toggle_file_selection(file_name: String, btn: Button) -> void:
+	if file_name in _selected_files:
+		_selected_files.erase(file_name)
 	else:
-		return "%.1f GB" % (bytes / 1024.0 / 1024.0 / 1024.0)
+		_selected_files.append(file_name)
+
+	_update_button_selection_style(btn, file_name)
+	selection_changed.emit(_selected_files)
 
 
-func _update_button_style(btn: Button, file_name: String) -> void:
-	if file_name in selected_files:
-		btn.add_theme_color_override("font_color", Color(0.2, 1.0, 0.4))
-		btn.add_theme_color_override("font_focus_color", Color(0.4, 1.0, 0.6))
-		btn.add_theme_color_override("font_hover_color", Color(0.3, 1.0, 0.5))
+func _update_button_selection_style(btn: Button, file_name: String) -> void:
+	if file_name in _selected_files:
+		btn.add_theme_color_override("font_color", Settings.SELECTION_COLOR)
+		btn.add_theme_color_override("font_focus_color", Settings.SELECTION_FOCUS_COLOR)
+		btn.add_theme_color_override("font_hover_color", Settings.SELECTION_FOCUS_COLOR)
 	else:
 		btn.remove_theme_color_override("font_color")
 		btn.remove_theme_color_override("font_focus_color")
 		btn.remove_theme_color_override("font_hover_color")
 
 
-func _on_file_pressed(file_name: String, is_dir: bool) -> void:
-	if is_dir:
-		set_path(current_path.path_join(file_name))
+# =============================================================================
+# Focus Management
+# =============================================================================
+
+func _focus_first_item() -> void:
+	if _file_list.get_child_count() > 0:
+		var first := _file_list.get_child(0) as Button
+		if first:
+			first.grab_focus()
 	else:
-		file_selected.emit(file_name, is_dir)
+		_up_button.grab_focus()
 
 
-func _on_file_focus_entered(btn: Button) -> void:
-	_on_panel_focus_gained()
-	await get_tree().process_frame
-	scroll_container.ensure_control_visible(btn)
+func _focus_next_item(current_btn: Button) -> void:
+	var idx := current_btn.get_index()
+	if idx < _file_list.get_child_count() - 1:
+		var next := _file_list.get_child(idx + 1) as Button
+		if next:
+			next.grab_focus()
 
 
-func _on_panel_focus_gained() -> void:
-	panel_focused.emit()
-
-
-func toggle_selection() -> void:
-	var focused := _get_focused_button()
-	if focused == null:
-		return
-
-	var file_name: String = focused.get_meta("file_name")
-
-	if file_name in selected_files:
-		selected_files.erase(file_name)
-	else:
-		selected_files.append(file_name)
-
-	_update_button_style(focused, file_name)
-	selection_changed.emit(selected_files)
-
-	# Move focus to next item
-	var idx := focused.get_index()
-	if idx < file_list.get_child_count() - 1:
-		var next_btn := file_list.get_child(idx + 1) as Button
-		if next_btn:
-			next_btn.grab_focus()
-
-
-func select_all() -> void:
-	selected_files.clear()
-	for file_name in file_buttons.keys():
-		selected_files.append(file_name)
-		_update_button_style(file_buttons[file_name], file_name)
-	selection_changed.emit(selected_files)
-
-
-func deselect_all() -> void:
-	for file_name in selected_files:
-		if file_name in file_buttons:
-			_update_button_style(file_buttons[file_name], file_name)
-	selected_files.clear()
-	selection_changed.emit(selected_files)
-
-
-func get_selected_files() -> Array[String]:
-	return selected_files
-
-
-func get_focused_file() -> String:
-	var focused := _get_focused_button()
-	if focused:
-		return focused.get_meta("file_name")
-	return ""
-
-
-func get_files_for_operation() -> Array[String]:
-	if selected_files.size() > 0:
-		return selected_files.duplicate()
-	var focused := get_focused_file()
-	if not focused.is_empty():
-		return [focused]
-	return []
-
-
-func is_focused_item_directory() -> bool:
-	var focused := _get_focused_button()
-	if focused and focused.has_meta("is_dir"):
-		return focused.get_meta("is_dir")
-	return false
-
-
-func go_up() -> void:
-	var parent := current_path.get_base_dir()
-	if parent != current_path and not parent.is_empty():
-		var current_dir_name := current_path.get_file()
-		set_path(parent, current_dir_name)
-
-
-func focus_panel() -> void:
-	_focus_first_item()
-	_on_panel_focus_gained()
-
-
-func refresh() -> void:
-	var old_selected := selected_files.duplicate()
-	var old_focused := get_focused_file()
-	_pending_focus_item = old_focused
-
-	update_file_list()
-
-	# Restore selection for files that still exist
-	for file_name in old_selected:
-		if file_name in file_buttons:
-			selected_files.append(file_name)
-			_update_button_style(file_buttons[file_name], file_name)
-
-
-func has_focus_in_panel() -> bool:
-	var focused := get_viewport().gui_get_focus_owner()
-	if focused == null:
-		return false
-	return focused == home_button or focused == up_button or focused == hidden_button or (focused is Button and focused.has_meta("file_name") and focused.get_parent() == file_list)
-
-
-func _get_focused_button() -> Button:
+func _get_focused_file_button() -> Button:
 	var focused := get_viewport().gui_get_focus_owner()
 	if focused is Button and focused.has_meta("file_name"):
 		return focused as Button
 	return null
 
 
-func _focus_first_item() -> void:
-	if file_list.get_child_count() > 0:
-		var first := file_list.get_child(0) as Button
-		if first:
-			first.grab_focus()
+func _emit_panel_focused() -> void:
+	panel_focused.emit()
+
+
+# =============================================================================
+# Event Handlers
+# =============================================================================
+
+func _on_file_button_pressed(file_name: String, is_dir: bool) -> void:
+	if is_dir:
+		set_directory(current_path.path_join(file_name))
 	else:
-		up_button.grab_focus()
+		file_activated.emit(current_path.path_join(file_name))
+
+
+func _on_file_button_focus_entered(btn: Button) -> void:
+	_emit_panel_focused()
+	# Ensure visible in scroll container
+	await get_tree().process_frame
+	_scroll_container.ensure_control_visible(btn)
 
 
 func _on_home_pressed() -> void:
-	set_path(_get_home_directory())
+	go_home()
 
 
 func _on_up_pressed() -> void:
@@ -346,22 +421,10 @@ func _on_up_pressed() -> void:
 
 func _on_hidden_pressed() -> void:
 	show_hidden_files = not show_hidden_files
-	_update_hidden_button()
+	_update_hidden_button_display()
 	refresh()
 
 
-func _update_hidden_button() -> void:
-	hidden_button.text = "👁" if show_hidden_files else "◌"
-	hidden_button.tooltip_text = "Hide hidden files" if show_hidden_files else "Show hidden files"
-
-
-func _get_home_directory() -> String:
-	var home := OS.get_environment("HOME")
-	if not home.is_empty() and DirAccess.dir_exists_absolute(home):
-		return home
-
-	home = OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS).get_base_dir()
-	if DirAccess.dir_exists_absolute(home):
-		return home
-
-	return OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP)
+func _update_hidden_button_display() -> void:
+	_hidden_button.text = "👁" if show_hidden_files else "◌"
+	_hidden_button.tooltip_text = "Hide hidden files" if show_hidden_files else "Show hidden files"
