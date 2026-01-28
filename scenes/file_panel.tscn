@@ -6,7 +6,6 @@
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_bottom = -80.0
 grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 3
@@ -16,17 +15,34 @@ script = ExtResource("1_4wi4a")
 [node name="HBoxContainer" type="HBoxContainer" parent="."]
 layout_mode = 2
 
-[node name="Button" type="Button" parent="HBoxContainer"]
+[node name="HomeButton" type="Button" parent="HBoxContainer"]
+custom_minimum_size = Vector2(50, 0)
 layout_mode = 2
-text = "🏠 "
+tooltip_text = "Go to home directory"
+text = "🏠"
+
+[node name="UpButton" type="Button" parent="HBoxContainer"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+tooltip_text = "Go up one directory"
+text = "⬆"
+
+[node name="HiddenButton" type="Button" parent="HBoxContainer"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+tooltip_text = "Toggle hidden files"
+text = "👁"
 
 [node name="CurrentPathLabel" type="Label" parent="."]
 layout_mode = 2
-size_flags_vertical = 8
+size_flags_horizontal = 3
+text = "/home"
+text_overrun_behavior = 3
 
 [node name="ScrollContainer" type="ScrollContainer" parent="."]
 layout_mode = 2
 size_flags_vertical = 3
+horizontal_scroll_mode = 0
 
 [node name="FileList" type="VBoxContainer" parent="ScrollContainer"]
 layout_mode = 2
