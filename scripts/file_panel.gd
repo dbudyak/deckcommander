@@ -268,11 +268,24 @@ func is_focused_item_directory() -> bool:
 func go_up() -> void:
 	var parent := current_path.get_base_dir()
 	if parent != current_path and not parent.is_empty():
+		# Remember current directory name to focus it after going up
+		var current_dir_name := current_path.get_file()
 		set_path(parent)
+		# Focus the directory we just came from
+		_focus_item(current_dir_name)
 
 
 func focus_panel() -> void:
 	_focus_first_item()
+	# Emit focus signal even if empty (for panel tracking)
+	_on_panel_focus_gained()
+
+
+func _focus_item(item_name: String) -> void:
+	if item_name in file_buttons:
+		(file_buttons[item_name] as Button).grab_focus()
+	else:
+		_focus_first_item()
 
 
 func refresh() -> void:
@@ -311,6 +324,9 @@ func _focus_first_item() -> void:
 		var first := file_list.get_child(0) as Button
 		if first:
 			first.grab_focus()
+	else:
+		# Empty directory - focus the up button so panel still works
+		up_button.grab_focus()
 
 
 func _on_home_pressed() -> void:
