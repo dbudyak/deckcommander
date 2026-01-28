@@ -37,7 +37,7 @@ grow_vertical = 2
 alignment = 1
 
 [node name="PanelsContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
-custom_minimum_size = Vector2(0, 960)
+custom_minimum_size = Vector2(0, 900)
 layout_mode = 2
 size_flags_vertical = 3
 
@@ -47,6 +47,22 @@ layout_mode = 2
 [node name="RightPanel" parent="Panel/VBoxContainer/PanelsContainer" instance=ExtResource("3_tbgi4")]
 layout_mode = 2
 
-[node name="StatusLabel" type="HBoxContainer" parent="Panel/VBoxContainer"]
+[node name="StatusBar" type="HBoxContainer" parent="Panel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
-size_flags_vertical = 10
+size_flags_vertical = 8
+
+[node name="StatusLabel" type="Label" parent="Panel/VBoxContainer/StatusBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Ready"
+
+[node name="HintsLabel" type="Label" parent="Panel/VBoxContainer/StatusBar"]
+layout_mode = 2
+size_flags_horizontal = 10
+text = "INS:Select  F5:Copy  F6:Move  F8:Del  Tab:Switch"
+
+[node name="ConfirmDialog" type="ConfirmationDialog" parent="."]
+title = "Confirm"
+initial_position = 1
+size = Vector2i(400, 150)
