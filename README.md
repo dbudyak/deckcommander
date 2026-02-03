@@ -116,7 +116,7 @@ assets/
 ## Technical Details
 
 - **Engine**: Godot 4.4 with GL Compatibility renderer
-- **Resolution**: 1920x1080 (optimized for Steam Deck)
+- **Resolution**: 1280x800 (optimized for Steam Deck)
 - **Frame Rate**: 90 FPS max
 - **Input**: Full gamepad and keyboard support
 
